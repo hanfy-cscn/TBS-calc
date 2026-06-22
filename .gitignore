@@ -1,0 +1,4 @@
+.claude/
+memory/
+*.md
+*.mjs

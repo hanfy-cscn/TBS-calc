@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NR TBS 计算工具 — TS 38.214</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f6fa; color: #2d3436; padding: 16px; }
+.container { max-width: 1400px; margin: 0 auto; }
+
+h1 { font-size: 20px; margin-bottom: 12px; color: #0984e3; }
+h1 small { font-size: 12px; color: #636e72; font-weight: normal; margin-left: 6px; }
+@media (max-width:480px) {
+  h1 { font-size: 17px; }
+  h1 small { display: block; margin-left: 0; margin-top: 2px; font-size: 11px; }
+}
+
+/* —— Control Panel —— */
+.panel { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 16px; }
+.panel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 12px; align-items: end; }
+@media (max-width:480px) {
+  .panel-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+}
+.field { display: flex; flex-direction: column; }
+.field label { font-size: 11px; color: #636e72; margin-bottom: 3px; white-space: nowrap; }
+.field input, .field select { height: 38px; border: 1px solid #dfe6e9; border-radius: 4px; padding: 0 8px; font-size: 15px; outline: none; transition: border .15s; background: #fff; }
+.field input:focus, .field select:focus { border-color: #0984e3; }
+.field input[type=number] { width: 100%; }
+.prb-group { display: flex; gap: 4px; align-items: center; }
+.prb-group input { width: 48px; text-align: center; }
+.prb-group span { color: #636e72; font-size: 13px; }
+.btn { height: 38px; padding: 0 18px; border: none; border-radius: 4px; font-size: 14px; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.btn-primary { background: #0984e3; color: #fff; }
+.btn-primary:hover { background: #0770c2; }
+.btn-primary:active { background: #065fa8; }
+.btn-sm { padding: 0 10px; font-size: 12px; height: 32px; }
+.btn-outline { background: transparent; border: 1px solid #b2bec3; color: #636e72; }
+.btn-outline:hover { border-color: #0984e3; color: #0984e3; }
+.actions { display: flex; gap: 8px; align-items: center; }
+@media (max-width:480px) {
+  .actions { grid-column: 1 / -1; justify-content: center; }
+  .btn { height: 42px; font-size: 15px; flex: 1; max-width: 140px; }
+  .btn-sm { height: 42px; font-size: 14px; flex: 0; }
+}
+
+/* —— Result Table —— */
+.table-wrap { overflow-x: auto; overflow-y: auto; -webkit-overflow-scrolling: touch; background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+table { border-collapse: collapse; font-size: 12px; width: 100%; min-width: 500px; }
+thead th { background: #f8f9fa; position: sticky; top: 0; z-index: 1; padding: 6px 4px; border-bottom: 2px solid #dfe6e9; text-align: center; white-space: nowrap; }
+thead th.prb-header { background: #e8f4fd; }
+tbody td { padding: 4px 4px; text-align: center; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
+tbody tr:hover { background: #f8f9fa; }
+td.ninfo { color: #636e72; font-size: 11px; }
+td.tbs { font-weight: 600; color: #0984e3; }
+td.idx { color: #636e72; }
+td.qm { font-weight: 500; }
+td.r { font-family: "SF Mono", "Fira Code", monospace; }
+
+@media (max-width:480px) {
+  table { font-size: 11px; min-width: 400px; }
+  tbody td { padding: 3px 3px; }
+  thead th { padding: 5px 3px; }
+}
+
+/* —— Status —— */
+#status { margin-top: 8px; font-size: 12px; color: #636e72; word-break: break-all; }
+
+/* —— Server hint —— */
+.server-hint { background: #ffeaa7; border-radius: 6px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; display: none; }
+.server-hint code { background: rgba(0,0,0,.06); padding: 1px 6px; border-radius: 3px; font-family: "SF Mono", "Fira Code", monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>NR TBS 计算工具 <small>TS 38.214 §5.1.3.2</small></h1>
+<div class="server-hint" id="serverHint"></div>
+
+<!-- ======== Control Panel ======== -->
+<div class="panel">
+  <div class="panel-grid">
+    <div class="field">
+      <label>PRB 范围</label>
+      <div class="prb-group">
+        <input type="number" id="prbFrom" value="12" min="1" max="275">
+        <span>~</span>
+        <input type="number" id="prbTo" value="12" min="1" max="275">
+      </div>
+    </div>
+    <div class="field">
+      <label>N_symb^sh（时隙符号数）</label>
+      <input type="number" id="sym" value="12" min="1" max="14">
+    </div>
+    <div class="field">
+      <label>N_dmrs^PRB（DMRS RE/PRB）</label>
+      <input type="number" id="dmrs" value="12" min="0" max="168">
+    </div>
+    <div class="field">
+      <label>N_oh^PRB（高层开销）</label>
+      <input type="number" id="oh" value="0" min="0" step="6">
+    </div>
+    <div class="field">
+      <label>缩放因子 S</label>
+      <input type="number" id="scaling" value="1.0" min="0" max="1" step="0.01">
+    </div>
+    <div class="field">
+      <label>层数 ν</label>
+      <input type="number" id="layers" value="1" min="1" max="8">
+    </div>
+    <div class="field">
+      <label>MCS 表</label>
+      <select id="mcsTable">
+        <option value="1">表1 — 64QAM</option>
+        <option value="2">表2 — 256QAM</option>
+        <option value="3">表3 — 64QAM Low SE</option>
+      </select>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="onCalculate()">计算</button>
+      <button class="btn btn-outline btn-sm" onclick="onCopyCSV()">📋 复制 CSV</button>
+    </div>
+  </div>
+  <div id="status"></div>
+</div>
+
+<!-- ======== Result ======== -->
+<div class="table-wrap" id="resultWrap">
+  <table id="resultTable">
+    <thead><tr><th colspan="100%">点击「计算」查看结果</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+</div>
+
+<script>
+// ============================================================
+// 1. TBS Lookup Table — TS 38.214 Table 5.1.3.2-2
+// ============================================================
+const TBS_TABLE = [
+  24,  32,  40,  48,  56,  64,  72,  80,  88,  96,
+  104, 112, 120, 128, 136, 144, 152, 160, 168, 176,
+  184, 192, 208, 224, 240, 256, 272, 288, 304, 320,
+  336, 352, 368, 384, 408, 432, 456, 480, 504, 528,
+  552, 576, 608, 640, 672, 704, 736, 768, 808, 848,
+  888, 928, 984, 1032,1064,1128,1160,1192,1224,1256,
+  1288,1320,1352,1416,1480,1544,1608,1672,1736,1800,
+  1864,1928,2024,2088,2152,2216,2280,2408,2472,2536,
+  2600,2664,2728,2792,2856,2976,3104,3240,3368,3496,
+  3624,3752,3824
+];
+
+// ============================================================
+// 2. MCS Tables — TS 38.214 §5.1.3.1
+// Each entry: [Qm, R×1024]
+// ============================================================
+const MCS_TABLES = {
+  // Table 5.1.3.1-1 — 64QAM (MCS 0-28, 29-31 reserved)
+  1: [
+    [2,120],  [2,157],  [2,193],  [2,251],  [2,308],
+    [2,379],  [2,449],  [2,526],  [2,602],  [2,679],
+    [4,340],  [4,378],  [4,434],  [4,490],  [4,553],
+    [4,616],  [4,658],  [6,438],  [6,466],  [6,517],
+    [6,567],  [6,616],  [6,666],  [6,719],  [6,772],
+    [6,822],  [6,873],  [6,910],  [6,948]
+  ],
+  // Table 5.1.3.1-2 — 256QAM (MCS 0-27, 28 reserved, 29-31 reserved)
+  2: [
+    [2,120],  [2,157],  [2,193],  [2,251],  [2,308],
+    [2,379],  [2,449],  [2,526],  [2,602],  [2,679],
+    [4,340],  [4,378],  [4,434],  [4,490],  [4,553],
+    [4,616],  [4,658],  [6,466],  [6,517],  [6,567],
+    [6,616],  [6,666],  [6,719],  [6,772],  [6,822],
+    [6,873],  [6,910],  [6,948],  [8,805]
+  ],
+  // Table 5.1.3.1-3 — 64QAM Low SE (MCS 0-28, 29-31 reserved)
+  3: [
+    [2, 30],  [2, 40],  [2, 50],  [2, 64],  [2, 78],
+    [2, 99],  [2,120],  [2,157],  [2,193],  [2,251],
+    [4,333],  [4,340],  [4,378],  [4,434],  [4,490],
+    [4,553],  [4,616],  [6,438],  [6,466],  [6,517],
+    [6,567],  [6,616],  [6,666],  [6,719],  [6,772],
+    [6,822],  [6,873],  [6,910],  [6,948]
+  ]
+};
+
+// ============================================================
+// 3. Core Algorithm — TS 38.214 §5.1.3.2
+// ============================================================
+function calcTBS(N_RE, R, Qm, nu, S) {
+  const N_info = N_RE * (R / 1024) * Qm * nu * S;
+  if (N_info <= 3824) {
+    // Small TBS branch
+    const n = Math.max(3, Math.floor(Math.log2(N_info)) - 6);
+    const step = 1 << n;  // 2^n
+    const N_prime = Math.max(24, step * Math.floor(N_info / step));
+    for (const t of TBS_TABLE) {
+      if (t >= N_prime) return { N_info, TBS: t };
+    }
+    return { N_info, TBS: 3824 };
+  } else {
+    // Large TBS branch
+    const n = Math.floor(Math.log2(N_info - 24)) - 5;
+    const step = 1 << n;
+    const N_prime = Math.max(3840, step * Math.round((N_info - 24) / step));
+    const C = Math.ceil((N_prime + 24) / 8424);  // BG1: Z_max=8448, CRC=24
+    const TBS = 8 * Math.ceil((N_prime + 24) / (8 * C)) - 24;
+    // Actually the full formula is more nuanced with base graph selection
+    // Simplified: use 8*ceil((N_prime+24)/(8*C))-24 for the final quantization
+    // Let me use the correct formula
+    let TBS_final;
+    if (R <= 1/4 || N_info <= 8424) {
+      // Base Graph 2
+      const C = Math.ceil((N_prime + 24) / 3816);
+      TBS_final = 8 * C * Math.ceil((N_prime + 24) / (8 * C)) - 24;
+    } else {
+      // Base Graph 1
+      const C = Math.ceil((N_prime + 24) / 8424);
+      TBS_final = 8 * C * Math.ceil((N_prime + 24) / (8 * C)) - 24;
+    }
+    return { N_info, TBS: TBS_final };
+  }
+}
+
+// ============================================================
+// 4. Main Calculation Handler
+// ============================================================
+function onCalculate() {
+  const prbFrom  = parseInt(document.getElementById('prbFrom').value);
+  const prbTo    = parseInt(document.getElementById('prbTo').value);
+  const sym      = parseInt(document.getElementById('sym').value);
+  const dmrs     = parseInt(document.getElementById('dmrs').value);
+  const oh       = parseInt(document.getElementById('oh').value);
+  const scaling  = parseFloat(document.getElementById('scaling').value);
+  const layers   = parseInt(document.getElementById('layers').value);
+  const tableIdx = parseInt(document.getElementById('mcsTable').value);
+
+  // Validate
+  const status = document.getElementById('status');
+  if (isNaN(prbFrom) || isNaN(prbTo) || prbFrom < 1 || prbTo < 1 || prbFrom > prbTo) {
+    status.textContent = '⚠ PRB 范围不合法';
+    return;
+  }
+
+  // Build PRB list
+  const prbs = [];
+  for (let p = prbFrom; p <= prbTo; p++) prbs.push(p);
+
+  const mcsData = MCS_TABLES[tableIdx];
+
+  // N_RE per PRB (same for all PRBs in this run)
+  const N_RE_per_PRB = Math.min(156, 12 * sym - dmrs - oh);
+  if (N_RE_per_PRB <= 0) {
+    status.textContent = '⚠ N_RE_per_PRB ≤ 0，请检查 DMRS/开销参数';
+    return;
+  }
+
+  // Build table: rows = MCS entries, cols = PRB
+  const rows = [];
+  for (let m = 0; m < mcsData.length; m++) {
+    const [Qm, R] = mcsData[m];
+    const row = { mcs: m, Qm, R, cells: [] };
+    for (const p of prbs) {
+      const N_RE = N_RE_per_PRB * p;
+      const result = calcTBS(N_RE, R, Qm, layers, scaling);
+      row.cells.push(result);
+    }
+    rows.push(row);
+  }
+
+  renderTable(rows, prbs, tableIdx);
+  status.textContent = `✓ 完成（MCS 表${tableIdx}，PRB ${prbFrom}~${prbTo}，N_RE/PRB = ${N_RE_per_PRB}）`;
+  window._lastRows = rows;
+  window._lastPrbs = prbs;
+}
+
+// ============================================================
+// 5. Render Table
+// ============================================================
+function renderTable(rows, prbs, tableIdx) {
+  const thead = document.querySelector('#resultTable thead');
+  const tbody = document.querySelector('#resultTable tbody');
+  thead.innerHTML = '';
+  tbody.innerHTML = '';
+
+  // Build header
+  let hRow = '<tr><th>MCS</th><th>Qm</th><th>R×1024</th>';
+  for (const p of prbs) {
+    hRow += `<th class="prb-header" colspan="2">${p} PRB</th>`;
+  }
+  hRow += '</tr>';
+  // Sub-header for Ninfo / TBS
+  let subRow = '<tr><th></th><th></th><th></th>';
+  for (const _ of prbs) {
+    subRow += '<th>N<sub>info</sub></th><th>TBS</th>';
+  }
+  subRow += '</tr>';
+
+  thead.innerHTML = hRow + subRow;
+
+  // Build body
+  for (const row of rows) {
+    const qamStr = row.Qm === 2 ? 'QPSK' : row.Qm === 4 ? '16QAM' : row.Qm === 6 ? '64QAM' : row.Qm === 8 ? '256QAM' : '';
+    let tr = `<tr><td class="idx">${row.mcs}</td><td class="qm" title="${qamStr}">${row.Qm}</td><td class="r">${row.R}</td>`;
+    for (const cell of row.cells) {
+      const nf = cell.N_info.toFixed(1);
+      tr += `<td class="ninfo">${nf}</td><td class="tbs">${cell.TBS}</td>`;
+    }
+    tr += '</tr>';
+    tbody.innerHTML += tr;
+  }
+}
+
+// ============================================================
+// 6. Copy CSV
+// ============================================================
+function onCopyCSV() {
+  const rows = window._lastRows;
+  const prbs = window._lastPrbs;
+  if (!rows || !rows.length) {
+    document.getElementById('status').textContent = '⚠ 请先点击「计算」';
+    return;
+  }
+
+  let csv = 'MCS,Qm,R×1024';
+  for (const p of prbs) csv += `,${p}PRB_Ninfo,${p}PRB_TBS`;
+  csv += '\n';
+
+  for (const row of rows) {
+    csv += `${row.mcs},${row.Qm},${row.R}`;
+    for (const cell of row.cells) {
+      csv += `,${cell.N_info.toFixed(1)},${cell.TBS}`;
+    }
+    csv += '\n';
+  }
+
+  navigator.clipboard.writeText(csv).then(() => {
+    document.getElementById('status').textContent = '✓ CSV 已复制到剪贴板';
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = csv;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    document.getElementById('status').textContent = '✓ CSV 已复制到剪贴板';
+  });
+}
+
+// ============================================================
+// 7. Auto-run on load
+// ============================================================
+// ============================================================
+// 8. Server detection — show network access info
+// ============================================================
+function showServerHint() {
+  const hint = document.getElementById('serverHint');
+  const host = location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') {
+    // Try to detect LAN IP
+    const pc = new RTCPeerConnection({ iceServers: [] });
+    pc.createDataChannel('');
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        const ip = e.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
+        if (ip && !ip[1].startsWith('127.')) {
+          hint.style.display = 'block';
+          hint.innerHTML = `📱 手机同一WiFi下访问：<code>http://${ip[1]}:${location.port}</code>`;
+        }
+      }
+    };
+    pc.createOffer().then(o => pc.setLocalDescription(o)).catch(() => {});
+  } else {
+    hint.style.display = 'block';
+    hint.innerHTML = `📱 手机访问：<code>http://${host}:${location.port}</code>`;
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  onCalculate();
+  showServerHint();
+});
+</script>
+</body>
+</html>
