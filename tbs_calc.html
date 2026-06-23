@@ -69,11 +69,80 @@ td.r { font-family: "SF Mono", "Fira Code", monospace; }
 /* —— Server hint —— */
 .server-hint { background: #ffeaa7; border-radius: 6px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; display: none; }
 .server-hint code { background: rgba(0,0,0,.06); padding: 1px 6px; border-radius: 3px; font-family: "SF Mono", "Fira Code", monospace; font-size: 12px; }
+
+/* —— Formula Box —— */
+.formula-box { background: #f0f4ff; border-radius: 8px; margin-bottom: 14px; border-left: 4px solid #0984e3; overflow: hidden; }
+.formula-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; cursor: pointer; user-select: none; }
+.formula-header h2 { font-size: 14px; color: #2d3436; margin: 0; }
+.formula-header .toggle { font-size: 12px; color: #636e72; transition: transform .2s; }
+.formula-header .toggle.open { transform: rotate(180deg); }
+.formula-body { padding: 0 14px 14px; font-size: 13px; line-height: 1.7; color: #2d3436; }
+.formula-body.collapsed { display: none; }
+.formula-body ol { margin: 6px 0 0 20px; padding: 0; }
+.formula-body li { margin-bottom: 6px; }
+.formula-body li:last-child { margin-bottom: 0; }
+.formula-body .step-label { font-weight: 600; color: #0984e3; margin-right: 4px; }
+.formula-body .fn { font-family: "SF Mono", "Fira Code", "Consolas", monospace; background: rgba(9,132,227,.08); padding: 1px 5px; border-radius: 3px; font-size: 13px; white-space: nowrap; }
+.formula-body .desc { color: #636e72; font-size: 12px; margin-left: 4px; }
+.formula-body .sub { margin-left: 24px; margin-top: 4px; padding: 6px 10px; background: rgba(9,132,227,.05); border-radius: 4px; }
+.formula-body .sub .fn { background: rgba(9,132,227,.12); }
+@media (max-width:480px) {
+  .formula-header { padding: 8px 10px; }
+  .formula-header h2 { font-size: 13px; }
+  .formula-body { padding: 0 10px 10px; font-size: 12px; }
+  .formula-body .fn { font-size: 12px; white-space: normal; }
+}
 </style>
 </head>
 <body>
 <div class="container">
 <h1>NR TBS 计算工具 <small>TS 38.214 §5.1.3.2</small></h1>
+<!-- ======== Formula Reference ======== -->
+<div class="formula-box">
+  <div class="formula-header" onclick="toggleFormula()">
+    <h2>📐 计算公式</h2>
+    <span class="toggle" id="formulaToggle">▼</span>
+  </div>
+  <div class="formula-body collapsed" id="formulaBody">
+    <ol>
+      <li>
+        <span class="step-label">Step 1</span>
+        <span class="fn">N'<sub>RE</sub> = 12 × N<sub>symb</sub><sup>sh</sup> − N<sub>dmrs</sub><sup>PRB</sup> − N<sub>oh</sub><sup>PRB</sup></span>
+        <span class="desc">— 每 PRB 可用 RE 数</span>
+      </li>
+      <li>
+        <span class="step-label">Step 2</span>
+        <span class="fn">N<sub>RE</sub> = min(156, N'<sub>RE</sub>) × n<sub>PRB</sub></span>
+        <span class="desc">— 总 RE 数</span>
+      </li>
+      <li>
+        <span class="step-label">Step 3</span>
+        <span class="fn">N<sub>info</sub> = N<sub>RE</sub> × R × Q<sub>m</sub> × ν × S</span>
+        <span class="desc">— 中间信息比特数</span>
+      </li>
+      <li>
+        <span class="step-label">Step 4</span>
+        <span>量化得到最终 TBS：</span>
+        <div class="sub">
+          <div>• 若 <span class="fn">N<sub>info</sub> ≤ 3824</span>（小 TBS 分支）：</div>
+          <div style="margin:2px 0 0 20px;">
+            <span class="fn">n = max(3, ⌊log<sub>2</sub>(N<sub>info</sub>)⌋ − 6)</span><br>
+            <span class="fn">N'<sub>info</sub> = max(24, 2<sup>n</sup> · ⌊ N<sub>info</sub> / 2<sup>n</sup> ⌋)</span><br>
+            <span class="fn">TBS = 查表取首个 ≥ N'<sub>info</sub> 的值</span>
+          </div>
+          <div style="margin-top:4px;">• 若 <span class="fn">N<sub>info</sub> > 3824</span>（大 TBS 分支）：</div>
+          <div style="margin:2px 0 0 20px;">
+            <span class="fn">n = ⌊log<sub>2</sub>(N<sub>info</sub> − 24)⌋ − 5</span><br>
+            <span class="fn">N'<sub>info</sub> = max(3840, 2<sup>n</sup> · round((N<sub>info</sub> − 24) / 2<sup>n</sup>))</span><br>
+            <span class="fn">选择 Base Graph 1 或 2，计算</span><br>
+            <span class="fn">TBS = 8 · C · ceil((N'<sub>info</sub> + 24) / (8 · C)) − 24</span>
+          </div>
+        </div>
+      </li>
+    </ol>
+  </div>
+</div>
+
 <div class="server-hint" id="serverHint"></div>
 
 <!-- ======== Control Panel ======== -->
@@ -133,6 +202,16 @@ td.r { font-family: "SF Mono", "Fira Code", monospace; }
 </div>
 
 <script>
+// ============================================================
+// 0. Formula box toggle
+// ============================================================
+function toggleFormula() {
+  const body = document.getElementById('formulaBody');
+  const toggle = document.getElementById('formulaToggle');
+  body.classList.toggle('collapsed');
+  toggle.classList.toggle('open');
+}
+
 // ============================================================
 // 1. TBS Lookup Table — TS 38.214 Table 5.1.3.2-2
 // ============================================================
